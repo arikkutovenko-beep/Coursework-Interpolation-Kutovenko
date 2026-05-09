@@ -31,41 +31,68 @@ namespace cursova_code.Desktop
         {
             ApplicationConfiguration.Initialize();
             InitDefaultData();
+
+            System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+
             Console.OutputEncoding = System.Text.Encoding.UTF8;
             Console.InputEncoding = System.Text.Encoding.UTF8;
 
             while (true)
             {
-                Console.Clear();
-                PrintHeader();
-                PrintCurrentPoints();
-
-                if (_hasUnsavedResult)
+                try
                 {
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($" [!] Є незбережений результат ({_lastUsedMethod})");
-                    Console.ResetColor();
+                    Console.Clear();
+                    PrintHeader();
+                    PrintCurrentPoints();
+
+                    if (_hasUnsavedResult)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine($" [!] Є незбережений результат ({_lastUsedMethod})");
+                        Console.ResetColor();
+                    }
+
+                    Console.WriteLine("\n [1] Ввести нові точки");
+                    Console.WriteLine(" [2] Обчислити значення");
+                    Console.WriteLine(" [3] Зберегти останній результат у файл (JSON)");
+                    Console.WriteLine(" [4] Завантажити вузли з файлу");
+                    Console.WriteLine(" [5] Переглянути останній запис в архіві");
+                    Console.WriteLine(" [6] Показати графік (Вікно)");
+                    Console.WriteLine(" [0] Вийти");
+                    Console.Write("\n Обери опцію: ");
+
+                    string choice = Console.ReadLine();
+                    if (string.IsNullOrWhiteSpace(choice)) continue;
+
+                    switch (choice)
+                    {
+                        case "1": InputPoints(); break;
+                        case "2": CalculateWithValidation(); break;
+                        case "3": SaveLastResult(); break;
+                        case "4": LoadData(); break;
+                        case "5": ShowArchive(); break;
+                        case "6": ShowGraphWindow(); break;
+                        case "0": return;
+                        default:
+                            Console.WriteLine("\n [!] Невірна опція. Спробуйте ще раз.");
+                            System.Threading.Thread.Sleep(1000);
+                            break;
+                    }
                 }
-
-                Console.WriteLine("\n [1] Ввести нові точки");
-                Console.WriteLine(" [2] Обчислити значення");
-                Console.WriteLine(" [3] Зберегти останній результат у файл (JSON)");
-                Console.WriteLine(" [4] Завантажити вузли з файлу");
-                Console.WriteLine(" [5] Переглянути останній запис в архіві");
-                Console.WriteLine(" [6] Показати графік (Вікно)");
-                Console.WriteLine(" [0] Вийти");
-                Console.Write("\n Обери опцію: ");
-
-                string choice = Console.ReadLine();
-                switch (choice)
+                catch (Exception ex)
                 {
-                    case "1": InputPoints(); break;
-                    case "2": CalculateWithValidation(); break;
-                    case "3": SaveLastResult(); break;
-                    case "4": LoadData(); break;
-                    case "5": ShowArchive(); break;
-                    case "6": ShowGraphWindow(); break;
-                    case "0": return;
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("\n====================================================");
+                    Console.WriteLine(" [КРИТИЧНА ПОМИЛКА ЗАХИСТУ]");
+                    Console.WriteLine($" Повідомлення: {ex.Message}");
+
+                    if (ex.InnerException != null)
+                        Console.WriteLine($" Деталі: {ex.InnerException.Message}");
+
+                    Console.WriteLine("====================================================");
+                    Console.ResetColor();
+                    Console.WriteLine("\n Програма стабілізована. Натисніть будь-яку клавішу...");
+                    Console.ReadKey();
                 }
             }
         }
@@ -91,6 +118,7 @@ namespace cursova_code.Desktop
                 var method = _methods[methodChoice - 1];
                 int count = _points.Count;
                 bool isValid = true;
+
                 if (method is NewtonMethod && (count < 2 || count > 20))
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
@@ -112,8 +140,21 @@ namespace cursova_code.Desktop
                 }
 
                 Console.Write("\n Введіть X для інтерполяції: ");
-                if (double.TryParse(Console.ReadLine(), out double targetX))
+                string inputX = Console.ReadLine()?.Replace(',', '.');
+
+                if (double.TryParse(inputX, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double targetX))
                 {
+                    double minX = _points.Min(p => p.X);
+                    double maxX = _points.Max(p => p.X);
+
+                    if (targetX < minX || targetX > maxX)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine($" [!] Попередження: X={targetX} поза межами інтервалу [{minX}; {maxX}].");
+                        Console.WriteLine(" Виконується екстраполяція, точність може бути низькою.");
+                        Console.ResetColor();
+                    }
+
                     try
                     {
                         Stopwatch sw = Stopwatch.StartNew();
@@ -141,6 +182,10 @@ namespace cursova_code.Desktop
                         Console.WriteLine($"\n [!] Помилка обчислень: {ex.Message}");
                     }
                 }
+                else
+                {
+                    Console.WriteLine(" [!] Помилка: Невірний формат числа X.");
+                }
             }
             Console.ReadKey();
         }
@@ -151,27 +196,28 @@ namespace cursova_code.Desktop
             Console.WriteLine(" --- Введення нових точок (Макс. точність: 8 знаків після коми) ---");
             Console.Write(" Скільки точок? ");
 
-            if (int.TryParse(Console.ReadLine(), out int count) && count >= 2)
+            if (int.TryParse(Console.ReadLine(), out int count) && count >= 2 && count <= 100)
             {
                 var newPoints = new List<PointModel>();
                 for (int i = 0; i < count; i++)
                 {
                     Console.Write($" Точка {i + 1} (X Y): ");
-                    string input = Console.ReadLine();
+                    string input = Console.ReadLine()?.Replace(',', '.');
                     var parts = input?.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
 
-                    if (parts?.Length == 2 && double.TryParse(parts[0], out double x) && double.TryParse(parts[1], out double y))
+                    if (parts?.Length == 2 &&
+                        double.TryParse(parts[0], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double x) &&
+                        double.TryParse(parts[1], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double y))
                     {
-                        
-                        if (parts[0].Contains(".") && parts[0].Split('.')[1].Length > 8 ||
-                            parts[1].Contains(".") && parts[1].Split('.')[1].Length > 8)
+                        if ((parts[0].Contains(".") && parts[0].Split('.')[1].Length > 8) ||
+                            (parts[1].Contains(".") && parts[1].Split('.')[1].Length > 8))
                         {
                             Console.ForegroundColor = ConsoleColor.Yellow;
                             Console.WriteLine(" [!] Попередження: Точність обмежена 8 знаками згідно ТЗ.");
                             Console.ResetColor();
                         }
 
-                        if (newPoints.Any(p => Math.Abs(p.X - x) < 1e-9))
+                        if (newPoints.Any(p => Math.Abs(p.X - x) < 1e-12))
                         {
                             Console.WriteLine(" [!] Помилка: X має бути унікальним!");
                             i--;
@@ -185,6 +231,12 @@ namespace cursova_code.Desktop
                     }
                 }
                 _points = newPoints.OrderBy(p => p.X).ToList();
+                _hasUnsavedResult = false;
+            }
+            else
+            {
+                Console.WriteLine(" [!] Невірна кількість точок (вкажіть від 2 до 100).");
+                System.Threading.Thread.Sleep(1000);
             }
         }
 
@@ -205,8 +257,38 @@ namespace cursova_code.Desktop
 
         private static void LoadData()
         {
-            _points = _fileService.LoadPoints(_filePath);
-            Console.WriteLine("\n [OK] Дані завантажені.");
+            Console.Write(" Введіть шлях до файлу (JSON): ");
+            string path = Console.ReadLine();
+
+            if (!File.Exists(path))
+            {
+                Console.WriteLine(" [!] Помилка: Файл не знайдено.");
+                return;
+            }
+
+            try
+            {
+                string json = File.ReadAllText(path);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    throw new Exception("Файл порожній.");
+                }
+
+                var loadedPoints = System.Text.Json.JsonSerializer.Deserialize<List<PointModel>>(json);
+
+                if (loadedPoints == null || loadedPoints.Count < 2)
+                {
+                    throw new Exception("Недостатньо точок у файлі (мінімум 2).");
+                }
+
+                _points = loadedPoints.OrderBy(p => p.X).ToList();
+                _hasUnsavedResult = false;
+                Console.WriteLine($" [OK] Завантажено {_points.Count} точок.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($" [!] Помилка завантаження: {ex.Message}");
+            }
             Console.ReadKey();
         }
 

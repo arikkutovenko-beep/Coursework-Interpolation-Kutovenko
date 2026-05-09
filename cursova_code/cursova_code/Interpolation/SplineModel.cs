@@ -40,8 +40,12 @@ namespace cursova_code.Interpolation
         {
             return _segments;
         }
+
         public double Interpolate(double x, List<PointModel> points)
         {
+            if (points == null || points.Count < 3)
+                throw new Exception("Для побудови кубічних сплайнів необхідно мінімум 3 точки.");
+
             if (_segments == null || _segments.Count == 0)
             {
                 BuildSplines(points);
@@ -79,10 +83,13 @@ namespace cursova_code.Interpolation
 
             double[] h = new double[n];
 
-            for (int i = 1; i< n;i++)
+            for (int i = 1; i < n; i++)
             {
                 h[i] = x[i] - x[i - 1];
+                if (h[i] < 1e-12)
+                    throw new Exception($"Помилка: занадто мала відстань між вузлами X[{i - 1}] та X[{i}].");
             }
+
             double[] c = new double[n];
             double[] alpha = new double[n];
             double[] beta = new double[n];
@@ -90,26 +97,29 @@ namespace cursova_code.Interpolation
             c[0] = 0;
             c[n - 1] = 0;
 
-            for(int i = 1; i< n-1;i++)
+            for (int i = 1; i < n - 1; i++)
             {
                 double A_mat = h[i];
                 double B_mat = 2.0 * (h[i] + h[i + 1]);
                 double C_mat = h[i + 1];
                 double F_mat = 3.0 * ((y[i + 1] - y[i]) / h[i + 1] - (y[i] - y[i - 1]) / h[i]);
 
-
                 double m = A_mat * alpha[i - 1] + B_mat;
+
+                if (Math.Abs(m) < 1e-15)
+                    throw new Exception("Система рівнянь для сплайнів вироджена (ділення на нуль).");
+
                 alpha[i] = -C_mat / m;
-                beta[i] = (F_mat - A_mat * beta[i-1]) / m;
+                beta[i] = (F_mat - A_mat * beta[i - 1]) / m;
             }
 
-            for(int i = n - 2; i> 0; i--)
+            for (int i = n - 2; i > 0; i--)
             {
                 c[i] = alpha[i] * c[i + 1] + beta[i];
             }
 
             _segments = new List<SplineSegment>();
-            for (int i = 0; i<n-1;i++)
+            for (int i = 0; i < n - 1; i++)
             {
                 int next = i + 1;
 
@@ -121,8 +131,11 @@ namespace cursova_code.Interpolation
             }
             _segments.Add(new SplineSegment(y[n - 1], 0, c[n - 1], 0, x[n - 1]));
         }
+
         public List<PointModel> GetCurvePoints(List<PointModel> points, double step)
         {
+            if (points == null || points.Count < 2) return new List<PointModel>();
+
             BuildSplines(points);
             List<PointModel> curve = new List<PointModel>();
             double startX = points[0].X;

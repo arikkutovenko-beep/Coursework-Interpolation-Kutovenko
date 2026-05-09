@@ -16,6 +16,7 @@ namespace cursova_code.Interpolation
         {
             return _diffTable;
         }
+
         public double Interpolate(double x, List<PointModel> points)
         {
             int n = points.Count;
@@ -44,12 +45,18 @@ namespace cursova_code.Interpolation
             {
                 _diffTable[i, 0] = points[i].Y;
             }
+
             for (int j = 1; j < n; j++)
             {
                 for (int i = 0; i < n - j; i++)
                 {
-                    _diffTable[i, j] = (_diffTable[i + 1, j - 1] - _diffTable[i, j - 1]) /
-                                        (points[i + j].X - points[i].X);
+                    double denominator = points[i + j].X - points[i].X;
+                    if (Math.Abs(denominator) < 1e-15)
+                    {
+                        throw new DivideByZeroException($"Вузли інтерполяції {i} та {i + j} збігаються або надто близькі (X={points[i].X}). Розрахунок неможливий.");
+                    }
+
+                    _diffTable[i, j] = (_diffTable[i + 1, j - 1] - _diffTable[i, j - 1]) / denominator;
                 }
             }
         }
