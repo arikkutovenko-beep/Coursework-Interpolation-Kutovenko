@@ -25,7 +25,8 @@ namespace cursova_code.IO
             {
                 var options = new JsonSerializerOptions
                 {
-                    WriteIndented = true
+                    WriteIndented = true,
+                    ReferenceHandler = ReferenceHandler.IgnoreCycles
                 };
 
                 var archive = new CalculationArchive
@@ -34,7 +35,7 @@ namespace cursova_code.IO
                     Method = methodName,
                     InputPoints = points,
                     Result = analyticExpression,
-                    Coefficients = coefficients?.ToString()
+                    Coefficients = coefficients
                 };
 
                 string jsonString = JsonSerializer.Serialize(archive, options);
@@ -60,7 +61,7 @@ namespace cursova_code.IO
 
                 using (JsonDocument doc = JsonDocument.Parse(jsonString))
                 {
-                    if (doc.RootElement.TryGetProperty("InputPoints", out _))
+                    if (doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("InputPoints", out _))
                     {
                         var archive = JsonSerializer.Deserialize<CalculationArchive>(jsonString);
                         return archive?.InputPoints ?? new List<PointModel>();
@@ -87,7 +88,13 @@ namespace cursova_code.IO
                     return null;
                 }
                 string jsonString = File.ReadAllText(filePath);
-                return JsonSerializer.Deserialize<CalculationArchive>(jsonString);
+
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+
+                return JsonSerializer.Deserialize<CalculationArchive>(jsonString, options);
             }
             catch (Exception ex)
             {

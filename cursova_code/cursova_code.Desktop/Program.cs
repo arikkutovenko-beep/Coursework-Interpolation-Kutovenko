@@ -258,37 +258,47 @@ namespace cursova_code.Desktop
         private static void LoadData()
         {
             Console.Write(" Введіть шлях до файлу (JSON): ");
-            string path = Console.ReadLine();
+            string path = Console.ReadLine()?.Trim('"'); 
 
-            if (!File.Exists(path))
+            if (string.IsNullOrEmpty(path) || !File.Exists(path))
             {
                 Console.WriteLine(" [!] Помилка: Файл не знайдено.");
+                Console.ReadKey();
                 return;
             }
 
             try
             {
-                string json = File.ReadAllText(path);
-                if (string.IsNullOrWhiteSpace(json))
-                {
-                    throw new Exception("Файл порожній.");
-                }
-
-                var loadedPoints = System.Text.Json.JsonSerializer.Deserialize<List<PointModel>>(json);
+                var fileService = new FileService();
+                var loadedPoints = fileService.LoadPoints(path);
 
                 if (loadedPoints == null || loadedPoints.Count < 2)
                 {
-                    throw new Exception("Недостатньо точок у файлі (мінімум 2).");
+                    throw new Exception("Недостатньо точок у файлі для інтерполяції (мінімум 2).");
+                }
+
+                var duplicates = loadedPoints
+                    .GroupBy(p => Math.Round(p.X, 10))
+                    .Where(g => g.Count() > 1)
+                    .Select(g => g.Key)
+                    .ToList();
+
+                if (duplicates.Any())
+                {
+                    throw new Exception($"Файл містить точки з однаковими X: {string.Join("; ", duplicates)}");
                 }
 
                 _points = loadedPoints.OrderBy(p => p.X).ToList();
                 _hasUnsavedResult = false;
+
                 Console.WriteLine($" [OK] Завантажено {_points.Count} точок.");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($" [!] Помилка завантаження: {ex.Message}");
             }
+
+            Console.WriteLine(" Натисніть будь-яку клавішу...");
             Console.ReadKey();
         }
 

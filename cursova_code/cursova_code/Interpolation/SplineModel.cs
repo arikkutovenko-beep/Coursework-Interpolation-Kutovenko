@@ -134,15 +134,28 @@ namespace cursova_code.Interpolation
 
         public List<PointModel> GetCurvePoints(List<PointModel> points, double step)
         {
-            if (points == null || points.Count < 2) return new List<PointModel>();
+            List<PointModel> curve = new List<PointModel>();
+            if (points == null || points.Count < 2) return curve;
 
             BuildSplines(points);
-            List<PointModel> curve = new List<PointModel>();
+
             double startX = points[0].X;
             double endX = points[points.Count - 1].X;
+            double range = endX - startX;
 
-            for (double x_val = startX; x_val <= endX + (step / 2.0); x_val += step)
-                curve.Add(new PointModel(x_val, Interpolate(x_val, points)));
+            if (step <= 0 || step > range) step = range / 100.0;
+
+            for (double x_val = startX; x_val <= endX + (step / 10.0); x_val += step)
+            {
+                if (curve.Count > 10000) break;
+
+                double y_res = Interpolate(x_val, points);
+
+                if (!double.IsNaN(y_res) && !double.IsInfinity(y_res))
+                {
+                    curve.Add(new PointModel(x_val, y_res));
+                }
+            }
 
             return curve;
         }
